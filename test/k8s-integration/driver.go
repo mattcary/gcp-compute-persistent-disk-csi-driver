@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 )
 
@@ -78,21 +81,28 @@ func installDriver(platform, goPath, pkgDir, stagingImage, stagingVersion, deplo
 	if err != nil {
 		return fmt.Errorf("failed to deploy driver: %v", err)
 	}
-	klog.Infof("Deploying driver")
-	// TODO (#139): wait for driver to be running
-	if platform == "windows" {
-		klog.Infof("Waiting 15 minutes for the driver to start on Windows")
-		time.Sleep(15 * time.Minute)
-	} else {
-		klog.Infof("Waiting 5 minutes for the driver to start on Linux")
-		time.Sleep(5 * time.Minute)
-	}
-	out, err = exec.Command("kubectl", "describe", "pods", "-n", driverNamespace).CombinedOutput()
-	klog.Infof("describe pods \n %s", string(out))
 
+	// These are from deploy/kubernetes/base/
+	const driverNsName = "gce-pd-csi-driver"
+	const controllerName = "csi-gce-pd-controller"
+
+	var config string;
+	config, err = clientcmd.BuildConfigFromFlags("", "")
 	if err != nil {
-		return fmt.Errorf("failed to describe pods: %v", err)
+		return fmt.Errorf("could not find kubeconfig: %w", err)
 	}
+	cs := kubernetes.NewForConfigOrDie(config)
+
+	driverNs := cs.CoreV1().Namespace.Get(context.TODO(), driverNsName, metav1.GetOptions{})
+	controllerDeployment := cs.AppsV1().Deployments(driverNs).Get(context.TODO(), controllerName, metav1.GetOptions{})
+	if err = deployment.WaitForDeploymentComplete(cs, controllerDeployment); err != nil {
+		return fmt.Errorf("controller deployment failed to come up: %s", err)
+	}
+
+	// TODO (#139): also wait for the node DaemonSet to be running
+	// Use WaitForCSIDriverRegistrationOnAllNodes, when https://github.com/kubernetes/kubernetes/pull/93120
+	// goes in.
+
 	return nil
 }
 
