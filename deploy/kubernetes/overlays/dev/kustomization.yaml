@@ -8,15 +8,7 @@ patchesStrategicMerge:
 namespace: gce-pd-csi-driver
 transformers:
 - ../../images/dev
-patchesJson6902:
-- target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: csi-gce-pd-controller
-  path: controller-use-adc.yaml
 images:
 - name: gke.gcr.io/gcp-compute-persistent-disk-csi-driver
-  newName: gcr.io/mattcary-snapshot/csi/gce-pd-driver
-  newTag: 846e4511-9346-426f-9f2b-8052022bc37c
-
+  newName: gcr.io/mattcary-gke-dev-owned/csi/gce-pd-driver
+  newTag: latest

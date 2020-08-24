@@ -124,16 +124,38 @@ func generateTokenSource(ctx context.Context, configFile *ConfigFile) (oauth2.To
 
 	// Use DefaultTokenSource
 
+	// TODO(mattcary): is the compute scope necessary with the cloud platform scope?
 	tokenSource, err := google.DefaultTokenSource(
 		ctx,
 		compute.CloudPlatformScope,
 		compute.ComputeScope)
+
+	id, _ := metadata.ProjectID()
+	klog.V(2).Infof("metadata info: OnGCE: %v ProjectID: %v ", metadata.OnGCE(), id)
 
 	// DefaultTokenSource relies on GOOGLE_APPLICATION_CREDENTIALS env var being set.
 	if gac, ok := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS"); ok {
 		klog.V(2).Infof("GOOGLE_APPLICATION_CREDENTIALS env var set %v", gac)
 	} else {
 		klog.Warningf("GOOGLE_APPLICATION_CREDENTIALS env var not set")
+		
+		if (metadata.OnGCE()) {
+			// In this case, App default credentials (ADC) will be used. But depending on the client 
+			// library this will delegate to a ComputeTokenSource and drop the passed scopes. So
+			// in this case we explicitly get a ComputeTokenSource with the correct scopes.
+			//
+			// Note also that we are using the currently-recommended cloud platform scope rather than
+			// the deprecated technique of fine-grained scopes.
+			//
+			// This can be debugged by logging the initial token in newOauthClient, then running
+			// curl https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=XXX, replacing
+			// XXX with the logged token and comparing the reported scopes to those of the
+			// DefaultTokenSource logged below.
+			//
+			// TODO(mattcary): file a bug, it seems wrong for DefaultTokenSource to drop scopes.
+			klog.V(2).Infof("using compute token source")
+			tokenSource = google.ComputeTokenSource("", compute.CloudPlatformScope)
+		}
 	}
 	klog.V(2).Infof("Using DefaultTokenSource %#v", tokenSource)
 
@@ -190,10 +212,13 @@ func createCloudServiceWithDefaultServiceAccount(ctx context.Context, vendorVers
 }
 
 func newOauthClient(ctx context.Context, tokenSource oauth2.TokenSource) (*http.Client, error) {
+	klog.V(2).Infof("new oauth client with tokensource %v", tokenSource)
 	if err := wait.PollImmediate(5*time.Second, 30*time.Second, func() (bool, error) {
-		if _, err := tokenSource.Token(); err != nil {
+		if tok, err := tokenSource.Token(); err != nil {
 			klog.Errorf("error fetching initial token: %v", err)
 			return false, nil
+		} else {
+			klog.V(2).Infof("fetched initial token: %v", tok)
 		}
 		return true, nil
 	}); err != nil {

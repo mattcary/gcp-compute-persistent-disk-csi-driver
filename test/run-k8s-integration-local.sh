@@ -77,7 +77,7 @@ make -C "${PKGDIR}" test-k8s-integration
 # local K8s repo to get the e2e.test binary, and does not bring up or down the cluster
 
 "${PKGDIR}/bin/k8s-integration-test" --run-in-prow=false \
---staging-image="${GCE_PD_CSI_STAGING_IMAGE}" --service-account-file="${GCE_PD_SA_DIR}/cloud-sa.json" \
+--staging-image=${GCE_PD_CSI_STAGING_IMAGE} --service-account-file="${GCE_PD_SA_DIR}/cloud-sa.json" \
 --deploy-overlay-name=dev --bringup-cluster=false --teardown-cluster=false --local-k8s-dir="$KTOP" \
---storageclass-files=sc-standard.yaml,sc-balanced.yaml,sc-ssd.yaml --do-driver-build=false --test-focus='External.Storage' \
+--storageclass-files=sc-balanced.yaml --do-driver-build=true --test-focus='External.Storage' \
 --gce-zone="us-central1-b" --num-nodes="${NUM_NODES:-3}"

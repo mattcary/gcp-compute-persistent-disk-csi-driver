@@ -4,5 +4,5 @@ metadata:
   name: imagetag-gcepd-driver-dev
 imageTag:
   name: gke.gcr.io/gcp-compute-persistent-disk-csi-driver
-  newName: gcr.io/dyzz-csi-staging/csi/gce-pd-driver
+  newName: gcr.io/mattcary-gke-dev-owned/csi/gce-pd-driver
   newTag: "latest"
