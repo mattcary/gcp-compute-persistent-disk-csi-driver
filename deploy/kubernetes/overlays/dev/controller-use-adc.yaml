@@ -1,0 +1,7 @@
+- op: remove
+  path: /spec/template/spec/containers/env/name
+  value: GOOGLE_APPLICATION_CREDENTIALS
+- op: remove
+  path: /spec/template/spec/volumes/name
+  value: cloud-sa-volume
+

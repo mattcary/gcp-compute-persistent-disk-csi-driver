@@ -2,11 +2,21 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - ../alpha
-patches:
+patchesStrategicMerge:
 - controller_always_pull.yaml
 - node_always_pull.yaml
-namespace:
-  gce-pd-csi-driver
+namespace: gce-pd-csi-driver
 transformers:
 - ../../images/dev
+patchesJson6902:
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: csi-gce-pd-controller
+  path: controller-use-adc.yaml
+images:
+- name: gke.gcr.io/gcp-compute-persistent-disk-csi-driver
+  newName: gcr.io/mattcary-snapshot/csi/gce-pd-driver
+  newTag: 846e4511-9346-426f-9f2b-8052022bc37c
 

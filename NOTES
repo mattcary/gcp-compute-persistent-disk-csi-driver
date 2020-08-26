@@ -1,0 +1,43 @@
+gcloud iam service-accounts create kubetest
+
+for r in roles/compute.storageAdmin roles/iam.serviceAccountUser projects/mattcary-gke-dev-owned/roles/gcp_compute_persistent_disk_csi_driver_custom_role; do gcloud projects add-iam-policy-binding mattcary-gke-dev-owned --member serviceAccount:kubetest@mattcary-gke-dev-owned.iam.gserviceaccount.com --role $r; done
+
+# The following did not work
+gcloud projects add-iam-policy-binding mattcary-gke-dev-owned --member serviceAccount:kubetest@mattcary-gke-dev-owned.iam.gserviceaccount.com --role roles/viewer
+
+# instead do gsutil iam get on the staging bucket and change the following with gsuilt iam set
+    {
+      "members": [
+        "projectViewer:mattcary-gke-dev-owned",
+        "serviceAccount:kubetest@mattcary-gke-dev-owned.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.legacyBucketReader"
+    }
+    {
+      "members": [
+        "projectViewer:mattcary-gke-dev-owned",
+        "serviceAccount:kubetest@mattcary-gke-dev-owned.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.legacyObjectReader"
+    }
+
+gcloud compute instances stop e2e-test-mattcary-master
+
+# Maybe add scopes compute-rw,storage-ro although I think they're not necessary
+gcloud compute instances set-service-account e2e-test-mattcary-master --service-account kubetest@mattcary-gke-dev-owned.iam.gserviceaccount.com --scopes https://www.googleapis.com/auth/cloud-platform
+
+gcloud compute instances start e2e-test-mattcary-master
+
+
+# Creating tokens manually from nodes or containers.
+curl "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token?scopes=https://www.googleapis.com/auth/cloud-platform" -H "Metadata-Flavor: Google"
+curl https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=XXX
+
+The driver doesn't run on the master in these tests! It's deployed as a pod, and the master node is unschedulable.
+So cluster up'ing needs to set the *minion* nodes to have a service account.
+Note that needs to be done via the instance-template as instance-groups managed create doesn't have a 
+service-account parameter
+
+Already plumbed:
+
+NODE_SCOPES=https://www.googleapis.com/auth/cloud-platform NODE_SERVICE_ACCOUNT=kubetest@mattcary-gke-dev-owned.iam.gserviceaccount.com kubetest --up
