@@ -19,6 +19,8 @@ import (
 	"context"
 	"flag"
 	"math/rand"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"time"
 
@@ -40,6 +42,7 @@ var (
 	httpEndpoint         = flag.String("http-endpoint", "", "The TCP network address where the prometheus metrics endpoint will listen (example: `:8080`). The default is empty string, which means metrics endpoint is disabled.")
 	metricsPath          = flag.String("metrics-path", "/metrics", "The HTTP path where prometheus metrics will be exposed. Default is `/metrics`.")
 	extraVolumeLabelsStr = flag.String("extra-labels", "", "Extra labels to attach to each PD created. It is a comma separated list of key value pairs like '<key1>=<value1>,<key2>=<value2>'. See https://cloud.google.com/compute/docs/labeling-resources for details")
+	pprofEndpoint        = flag.String("pprof-endpoint", "", "The endpoint for pprof profiling. If empty, pprof is disabled. A typical value is localhost:22024.")
 	version              string
 )
 
@@ -60,8 +63,35 @@ func init() {
 func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
+	pprofDefer := startPProf()
+	defer pprofDefer()
 	handle()
 	os.Exit(0)
+}
+
+func startPProf() func() {
+	if pprofEndpoint == nil || len(*pprofEndpoint) == 0 {
+		return func() {}
+	}
+	klog.Infof("Enabling pprof at %s", *pprofEndpoint)
+
+	dmux := http.NewServeMux()
+	dmux.HandleFunc("/debug/pprof/", pprof.Index)
+	dmux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	dmux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	dmux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	dmux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	ds := http.Server{
+		Addr:    *pprofEndpoint,
+		Handler: dmux,
+	}
+	go func() {
+		if err := ds.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			klog.Fatalf("Failed to start debug server:%v", err)
+		}
+	}()
+	klog.Infof("PProf debug server listening at addrress %v", *pprofEndpoint)
+	return func() {	ds.Shutdown(context.Background()) }
 }
 
 func handle() {
