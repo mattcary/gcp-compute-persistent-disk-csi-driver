@@ -127,8 +127,8 @@ var _ = BeforeSuite(func() {
 				tcc <- NewDefaultTestContext(curZone, strconv.Itoa(randInt))
 			}(zone, j)
 		}
-		wg.Add(1)
 		if *hdMachineType != noMachineType {
+			wg.Add(1)
 			go func(curZone string) {
 				defer GinkgoRecover()
 				defer wg.Done()
@@ -147,10 +147,12 @@ var _ = BeforeSuite(func() {
 		testContexts = append(testContexts, tc)
 		klog.Infof("Added TestContext for node %s", tc.Instance.GetName())
 	}
-	for i := 0; i < len(zones); i++ {
-		tc := <-hdtcc
-		hyperdiskTestContexts = append(hyperdiskTestContexts, tc)
-		klog.Infof("Added TestContext for node %s", tc.Instance.GetName())
+	if *hdMachineType != noMachineType {
+		for i := 0; i < len(zones); i++ {
+			tc := <-hdtcc
+			hyperdiskTestContexts = append(hyperdiskTestContexts, tc)
+			klog.Infof("Added TestContext for node %s", tc.Instance.GetName())
+		}
 	}
 })
 
